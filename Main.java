@@ -1,3 +1,5 @@
+import com.ibm.db2.jcc.DB2Driver;
+
 import java.sql.* ;
 import java.util.ArrayList;
 import java.util.Scanner;
@@ -12,7 +14,7 @@ class Main
 
     public static Statement setupDatabase() throws SQLException {
         // Register the driver.  You must register the driver before you can use it.
-        try { DriverManager.registerDriver ( new com.ibm.db2.jcc.DB2Driver() ) ; }
+        try { DriverManager.registerDriver ( new DB2Driver() ) ; }
         catch (Exception cnfe){ System.out.println("Class not found"); }
 
         // This is the url you must use for DB2.
@@ -38,11 +40,25 @@ class Main
         return statement;
     }
 
+    public static void noMatchFood(String foodInput) {
+        System.out.println("ERROR : There's no food with name '" + foodInput +
+                "'.\nTo restock the inventory, you can choose option (6), but for now, you can choose another item.");
+    }
+
+    public static void selectStoreText() throws SQLException {
+        System.out.println("Select your store from the options below : ");
+        System.out.println(" (1) Downtown Market");
+        System.out.println(" (2) Laval Central Market");
+        System.out.println(" (3) Sherbrooke Fresh Market");
+        System.out.println(" (4) Longueuil Market");
+        System.out.println(" (5) Brossard Market");
+        System.out.print("Enter the ID of your preferred store : ");
+    }
 
     public static void placeOrder(Scanner scanner)  throws SQLException {
         // important attributes
         String email;
-        int storeID;
+        int storeID = 0;
         ArrayList<Object[]> newOrder = new ArrayList<Object[]>();
 
         System.out.println("\n(1) PLACING AN ORDER\n");
@@ -58,7 +74,7 @@ class Main
         }
 
         // getting the store the user wants to order from
-        System.out.print("Enter the ID of your preferred store (1-5) : ");
+        selectStoreText();
         String storeIDinput = scanner.nextLine();
         storeID = PlaceOrder.chooseStore(storeIDinput);
 
@@ -70,7 +86,7 @@ class Main
 
         // choosing the food the user wants to order
         System.out.println("Great! Let's start building your order.");
-        System.out.print("Enter the name of the food item you'd like to order : ");
+        System.out.print("\nEnter the name of the food item you'd like to order : ");
         String foodInput = "NULL";
 
         int curQty;
@@ -84,11 +100,11 @@ class Main
             Object[] currentOrder = new Object[4];
 
             if (iterations != 0) {  // give the user an option to stop ordering
-                System.out.print("Enter the name of the food item you'd like to order (or press ENTER to stop) : ");
+                System.out.print("\nEnter the name of the food item you'd like to order (or press ENTER to stop) : ");
             }
 
             foodInput = scanner.nextLine();
-            curFoodInfo = PlaceOrder.getFoodID(foodInput);
+            curFoodInfo = PlaceOrder.getFoodInfo(foodInput);
             curFoodID = curFoodInfo[0];
             curFoodPrice = curFoodInfo[1];
 
@@ -99,9 +115,8 @@ class Main
 
             // if there's no food with the name entered
             if (curFoodInfo[0] == -1) {
-                System.out.println("ERROR : There's no food with name '" + foodInput +
-                        "'.\nTo restock the inventory, you can choose option (6), but for now, you can choose another item.");
-                System.out.println("Enter the name of the food item you'd like to order (or press ENTER to stop) : ");
+                noMatchFood(foodInput);
+                System.out.println("\nEnter the name of the food item you'd like to order (or press ENTER to stop) : ");
                 continue;
             }
 
@@ -119,6 +134,11 @@ class Main
 
             // if numLeft < curQty for that specific food, then display an error message
             int numLeft = PlaceOrder.getNumLeft((int) curFoodID, storeID);
+            if (numLeft <= 0) {
+                System.out.println("This item is currently out of stock in your store.\n" +
+                        "To restock the inventory, you can choose option (6), but for now, you can choose another item.");
+                continue;
+            }
             if (numLeft < curQty) {
                 System.out.println("There are currently only " + numLeft + " of such items left in your store. Choose a different quantity.");
                 continue;
@@ -149,11 +169,12 @@ class Main
         PlaceOrder.appendOrderItems(newOrderID, newOrder);
 
         // updating the Payment table
-        System.out.println("The total comes down to : " + total + "$");
+        System.out.println("The total comes down to " + total + "$");
         System.out.println("Select your payment type from the options below : ");
         System.out.println(" (1) Debit card");
         System.out.println(" (2) Credit card");
         System.out.println(" (3) Digital wallet");
+        System.out.print("Desired payment type : ");
         paymentInput = scanner.nextLine();
 
         while (!(paymentInput.equals("1") || paymentInput.equals("2") || paymentInput.equals("3"))) {
@@ -162,17 +183,73 @@ class Main
         }
         PlaceOrder.appendPayment(newOrderID, paymentInput, total, email);
 
-        System.out.println("Your order has been processed, thank you!");
+        System.out.println("Your order has been processed, thank you for shopping with us!\n" +
+                "Order ID : " + newOrderID);
     } // ending of placeOrder
 
     public static void editOrder(Scanner scanner)  throws SQLException {
         System.out.println("\n(2) EDITING AN ORDER\n");
-
     }
 
     public static void foodLookup(Scanner scanner)  throws SQLException {
         System.out.println("\n(3) LOOK UP FOOD AVAILABILITY\n");
+        int storeID = -1;
+        String[] storeNames = new String[6];
+        storeNames[0] = "dummy value";
+        storeNames[1] = "Downtown Market";
+        storeNames[2] = "Laval Central Market";
+        storeNames[3] = "Sherbrooke Fresh Market";
+        storeNames[4] = "Longueuil Market";
+        storeNames[5] = "Brossard Market";
 
+        // if there's no store with the ID entered
+        while (storeID == -1) {
+            selectStoreText();
+            String storeIDinput = scanner.nextLine();
+            storeID = PlaceOrder.chooseStore(storeIDinput);
+
+            // if there's no store with the ID entered
+            if (storeID == -1) {
+                System.out.println("ERROR : There's no store with ID '" + storeIDinput + "'. Choose an ID between 1 and 5\n");
+            }
+        }
+
+        System.out.print("Enter the name of the food item you'd like to look up : ");
+        String foodInput = scanner.nextLine();
+
+        int foodID = FoodLookup.getFoodID(foodInput);
+        while (foodID == -1) {
+            noMatchFood(foodInput);
+            System.out.print("Enter the name of the food item you'd like to look up : ");
+            foodInput = scanner.nextLine();
+            foodID = FoodLookup.getFoodID(foodInput);
+        }
+
+        int numLeft = PlaceOrder.getNumLeft(foodID, storeID);
+        if (numLeft <= 0) {
+            // suggest store that has the most items of foodID in stock
+            int otherStoreID = FoodLookup.getAlternateStore(foodID);
+            String otherStoreName = "";
+
+            if  (otherStoreID != -1) {
+                otherStoreName = storeNames[otherStoreID];
+            }
+
+            if ((otherStoreID == -1) || (otherStoreID == storeID)){
+                System.out.println("OUT OF STOCK : There are no " + foodInput + " items left in stock.\n" +
+                        "We suggest you restock the stores by selecting option (6).");
+            }
+            else {
+                System.out.println("OUT OF STOCK : There are no " + foodInput + " items left in stock in our "  + storeNames[storeID] + ".\n"
+                        + "Our store with the highest stock for that product is : " + otherStoreName + " (storeID : " + otherStoreID + ")");
+            }
+        }
+        else if (numLeft <= 5) {
+            System.out.println("LOW STOCK : There are currently only " + numLeft + " " + foodInput + " items left in our " + storeNames[storeID] + ".");
+        }
+        else {
+            System.out.println("There are currently " + numLeft + " " + foodInput + " items left in our " + storeNames[storeID] + ".");
+        }
     }
 
     public static void createAccount(Scanner scanner)  throws SQLException {
