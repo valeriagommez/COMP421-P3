@@ -49,7 +49,7 @@ public class PlaceOrder {
         return storeID;   // will be -1 if we found no match in the Stores table
     }
 
-    public static Float[] getFoodID (String foodInput) throws SQLException {
+    public static Float[] getFoodInfo(String foodInput) throws SQLException {
         float foodID = -1;
         float price = -1;
         try {
@@ -105,7 +105,6 @@ public class PlaceOrder {
         float curPrice;
 
         for (Object[] objects : order) {
-//            System.out.println(objects[0] + ", " + objects[1] + ", " + objects[2]);
             curPrice = (float) objects[1];
             curQty = (int) objects[2];
 
@@ -126,17 +125,14 @@ public class PlaceOrder {
 
             String insertSQL = "INSERT INTO Orders VALUES (" + newOrderID + ", NOW(), "
                     + total + ", '" + email + "', " + storeID + ")";
-//            System.out.println ( insertSQL ) ;
+
             Main.statement.executeUpdate ( insertSQL ) ;
-//            System.out.println ( "DONE" ) ;
         }
 
         catch (SQLException e) {
             Main.sqlCode = e.getErrorCode(); // Get SQLCODE
             Main.sqlState = e.getSQLState(); // Get SQLSTATE
 
-            // Your code to handle errors comes here;
-            // something more meaningful than a print would be good
             System.out.println("Code: " + Main.sqlCode + "  sqlState: " + Main.sqlState);
             System.out.println(e);
         }
