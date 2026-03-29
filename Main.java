@@ -252,9 +252,70 @@ class Main
         }
     }
 
-    public static void createAccount(Scanner scanner)  throws SQLException {
+
+    // helper function
+    public static void addUser(String email, String name, String address, String phoneNum) {
+        try {
+            String insertSQL = "INSERT INTO Users VALUES ('" + email + "', '" + name + "','" + address + "','" + phoneNum + "')";
+            Main.statement.executeUpdate ( insertSQL ) ;
+        }
+
+        catch (SQLException e) {
+            Main.sqlCode = e.getErrorCode(); // Get SQLCODE
+            Main.sqlState = e.getSQLState(); // Get SQLSTATE
+            System.out.println("Code: " + Main.sqlCode + "  sqlState: " + Main.sqlState);
+            System.out.println(e);
+        }
+    }
+    public static String getNumericInput(Scanner scanner, String prompt) {
+        System.out.print(prompt);
+        String input = scanner.nextLine();
+        while (!input.matches("\\d+")) {
+            System.out.println("ERROR : Please enter numbers only.");
+            System.out.print(prompt);
+            input = scanner.nextLine();
+        }
+        return input;
+    }
+
+    public static String capitalizeFirst(String input) {
+        if (input == null || input.isEmpty()) return input;
+        return input.substring(0, 1).toUpperCase() + input.substring(1);
+    }
+
+    public static void createAccount(Scanner scanner) throws SQLException {
         System.out.println("\n(4) CREATING AN ACCOUNT\n");
 
+        System.out.print("Enter your email : ");
+        String emailInput = scanner.nextLine();
+        String email = PlaceOrder.searchEmail(emailInput);
+
+        while (!(email.isEmpty())) {
+            System.out.println("ERROR : There's already a user with email address '" + emailInput + "'. Choose another email address.");
+            System.out.print("Enter your email : ");
+            emailInput = scanner.nextLine();
+            email = PlaceOrder.searchEmail(emailInput);
+        }
+
+        System.out.print("Enter your first name : ");
+        String firstNameInput = capitalizeFirst(scanner.nextLine());
+
+        System.out.print("Enter your last name : ");
+        String lastNameInput = capitalizeFirst(scanner.nextLine());
+        String name = firstNameInput + " " + lastNameInput;
+
+        String streetNum = getNumericInput(scanner, "Enter your street number : ");
+        System.out.print("Enter the name of your street : ");
+        String streetName = capitalizeFirst(scanner.nextLine());
+        System.out.print("Enter the name of the city : ");
+        String cityName = capitalizeFirst(scanner.nextLine());
+        System.out.print("Enter your postal code in the format 'A1B 2C3': ");
+        String postalCode = scanner.nextLine().toUpperCase();
+        String address = streetNum + " Rue " + streetName + " " + cityName + " QC " + postalCode;
+        String phoneNum = getNumericInput(scanner, "Enter your phone number : ");
+
+        addUser(emailInput, name, address, phoneNum);
+        System.out.println("Your account has been created successfully!");
     }
 
     public static void editUser(Scanner scanner)  throws SQLException {
@@ -316,43 +377,10 @@ class Main
         }
     }
 
-    public static void main(String[] args) throws SQLException
-    {
-//        int sqlCode=0;      // Variable to hold SQLCODE
-//        String sqlState="00000";  // Variable to hold SQLSTATE
-//
+    public static void main(String[] args) throws SQLException {
         statement = setupDatabase();
         mainLoop();
 
-        // testing
-//        try
-//        {
-//            String querySQL = "SELECT * FROM Inventory";
-//            System.out.println (querySQL) ;
-//            java.sql.ResultSet rs = statement.executeQuery ( querySQL ) ;
-//
-//            while ( rs.next ( ) )
-//            {
-//                int storeID = rs.getInt ( 1 ) ;
-//                int foodID = rs.getInt ( 2 ) ;
-//                int numLeft = rs.getInt ( 3 ) ;
-//                System.out.println ("Store ID :  " + storeID);
-//                System.out.println ("Food ID :  " + foodID);
-//                System.out.println ("Number left :  " + numLeft);
-//            }
-//            System.out.println ("DONE");
-//        }
-//        catch (SQLException e)
-//        {
-//            sqlCode = e.getErrorCode(); // Get SQLCODE
-//            sqlState = e.getSQLState(); // Get SQLSTATE
-//
-//            // Your code to handle errors comes here;
-//            // something more meaningful than a print would be good
-//            System.out.println("Code: " + sqlCode + "  sqlState: " + sqlState);
-//            System.out.println(e);
-//        }
-        // Finally but importantly close the statement and connection
         statement.close ( ) ;
         con.close ( ) ;
     }
