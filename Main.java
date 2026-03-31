@@ -21,8 +21,8 @@ class Main
         String url = "jdbc:db2://winter2026-comp421.cs.mcgill.ca:50000/comp421";
 
         //REMEMBER to remove your user id and password before submitting your code!!
-        String your_userid = "cs421g09";
-        String your_password = "Group-09!!!";
+        String your_userid = null;
+        String your_password = null;
 
         if(your_userid == null && (your_userid = System.getenv("SOCSUSER")) == null)
         {
