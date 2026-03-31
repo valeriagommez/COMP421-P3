@@ -187,9 +187,115 @@ class Main
                 "Order ID : " + newOrderID);
     } // ending of placeOrder
 
-    public static void editOrder(Scanner scanner)  throws SQLException {
+    public static void editOrder(Scanner scanner) throws SQLException {
         System.out.println("\n(2) EDITING AN ORDER\n");
-    }
+
+        System.out.print("Enter your email: ");
+        String emailInput = scanner.nextLine();
+        String email = PlaceOrder.searchEmail(emailInput);
+
+        if (email.isEmpty()) {
+            System.out.println("ERROR: No user found with email '" + emailInput + "'.");
+            return;
+        }
+
+        int[] orderInfo = EditOrder.getLatestOrder(email);
+        if (orderInfo == null) {
+            System.out.println("ERROR: No order found for this user within the last 24 hours. Orders made more than 24 hours prior cannot be edited.");
+            return;
+        }
+
+        int orderID = orderInfo[0];
+        int storeID = orderInfo[1];
+        EditOrder.printOrderItems(orderID);
+
+        String action = "";
+        while (!action.equals("done")) {
+            System.out.print("\nPick an action to edit your order. Type 'add', 'remove', or 'done': ");
+            action = scanner.nextLine().trim().toLowerCase();
+
+            if (action.equals("add")) {
+                System.out.print("Enter the name of the item to add: ");
+                String foodInput = scanner.nextLine();
+                Float[] foodInfo = PlaceOrder.getFoodInfo(foodInput);
+
+                if (foodInfo[0] == -1) {
+                    noMatchFood(foodInput);
+                    continue;
+                }
+
+                int foodID = foodInfo[0].intValue();
+                float price = foodInfo[1];
+                int numLeft = PlaceOrder.getNumLeft(foodID, storeID);
+
+                if (numLeft <= 0) {
+                    System.out.println("This item is out of stock at your store.");
+                    continue;
+                }
+
+                System.out.print("How many would you like to add? ");
+                if (!scanner.hasNextInt()) {
+                    System.out.println("Invalid input.");
+                    scanner.nextLine();
+                    continue;
+                }
+                int qty = scanner.nextInt();
+                scanner.nextLine();
+
+                if (qty > numLeft) {
+                    System.out.println("Only " + numLeft + " left in stock. Choose a smaller quantity.");
+                    continue;
+                }
+
+                EditOrder.addItem(orderID, foodID, price, qty, storeID);
+                System.out.println("Added " + qty + "x " + foodInput + " to order #" + orderID + ".");
+                EditOrder.printOrderItems(orderID);
+
+            } else if (action.equals("remove")) {
+                System.out.print("Enter the name of the item to remove: ");
+                String foodInput = scanner.nextLine();
+                Float[] foodInfo = PlaceOrder.getFoodInfo(foodInput);
+
+                if (foodInfo[0] == -1) {
+                    noMatchFood(foodInput);
+                    continue;
+                }
+
+                int foodID = foodInfo[0].intValue();
+                int existingQty = EditOrder.getItemQtyInOrder(orderID, foodID);
+
+                if (existingQty == -1) {
+                    System.out.println("That item is not in your order.");
+                    continue;
+                }
+
+                System.out.println("You currently have " + existingQty + "x " + foodInput + " in your order.");
+                System.out.print("How many would you like to remove? ");
+                if (!scanner.hasNextInt()) {
+                    System.out.println("Invalid input.");
+                    scanner.nextLine();
+                    continue;
+                }
+                int qty = scanner.nextInt();
+                scanner.nextLine();
+
+                if (qty > existingQty) {
+                    System.out.println("You only have " + existingQty + " of that item. Choose a smaller quantity.");
+                    continue;
+                }
+
+                EditOrder.removeItem(orderID, foodID, qty, storeID);
+                System.out.println("Removed " + qty + "x " + foodInput + " from order #" + orderID + ".");
+                EditOrder.printOrderItems(orderID);
+
+            } else if (!action.equals("done")) {
+                System.out.println("Invalid input. Type 'add', 'remove', or 'done'.");
+            }
+        }
+
+        EditOrder.recalculateTotal(orderID);
+        System.out.println("Order #" + orderID + " has been updated successfully!");
+    } // end of editOrder
 
     public static void foodLookup(Scanner scanner)  throws SQLException {
         System.out.println("\n(3) LOOK UP FOOD AVAILABILITY\n");
@@ -318,14 +424,216 @@ class Main
         System.out.println("Your account has been created successfully!");
     }
 
-    public static void editUser(Scanner scanner)  throws SQLException {
+    public static void editUser(Scanner scanner) throws SQLException {
         System.out.println("\n(5) UPDATING USER\n");
 
+        System.out.print("Enter your email : ");
+        String emailInput = scanner.nextLine();
+        String email = PlaceOrder.searchEmail(emailInput);
+
+        while (email.isEmpty()) {
+            System.out.println("ERROR : There is no user with email address '" + emailInput + "'.");
+            System.out.print("Enter your email : ");
+            emailInput = scanner.nextLine();
+            email = PlaceOrder.searchEmail(emailInput);
+        }
+
+        System.out.println("Select which information in your account that you would like to update : ");
+        System.out.println(" (1) Name");
+        System.out.println(" (2) Address");
+        System.out.println(" (3) Phone Number");
+        System.out.print("Enter your choice : ");
+
+        String editInput = scanner.nextLine();
+
+        while (!(editInput.equals("1") || editInput.equals("2") || editInput.equals("3"))) {
+            System.out.println("Invalid input. Please enter 1, 2, or 3.\nNote that you may not change the email associated with your account.");
+            System.out.print("Enter your choice : ");
+            editInput = scanner.nextLine();
+        }
+
+        if (editInput.equals("1")) {
+            System.out.print("Enter the name you wish to use : ");
+            String newName = scanner.nextLine();
+            try {
+                String updateSQL = "UPDATE Users SET name = '" + newName + "' WHERE email = '" + email + "'";
+                Main.statement.executeUpdate(updateSQL);
+                System.out.println("Name updated successfully!");
+            } catch (SQLException e) {
+                Main.sqlCode = e.getErrorCode();
+                Main.sqlState = e.getSQLState();
+                System.out.println("Code: " + Main.sqlCode + "  sqlState: " + Main.sqlState);
+            }
+
+        } else if (editInput.equals("2")) {
+            String streetNum = getNumericInput(scanner, "Enter your street number : ");
+            System.out.print("Enter the name of your street : ");
+            String streetName = capitalizeFirst(scanner.nextLine());
+            System.out.print("Enter the name of the city : ");
+            String cityName = capitalizeFirst(scanner.nextLine());
+            System.out.print("Enter your postal code in the format 'A1B 2C3' : ");
+            String postalCode = scanner.nextLine().toUpperCase();
+            String newAddress = streetNum + " Rue " + streetName + " " + cityName + " QC " + postalCode;
+            try {
+                String updateSQL = "UPDATE Users SET address = '" + newAddress + "' WHERE email = '" + email + "'";
+                Main.statement.executeUpdate(updateSQL);
+                System.out.println("Address updated successfully!");
+            } catch (SQLException e) {
+                Main.sqlCode = e.getErrorCode();
+                Main.sqlState = e.getSQLState();
+                System.out.println("Code: " + Main.sqlCode + "  sqlState: " + Main.sqlState);
+            }
+
+        } else if (editInput.equals("3")) {
+            String newNumber = getNumericInput(scanner, "Enter the phone number you wish to use : ");
+            try {
+                String updateSQL = "UPDATE Users SET phoneNum = '" + newNumber + "' WHERE email = '" + email + "'";
+                Main.statement.executeUpdate(updateSQL);
+                System.out.println("Phone number updated successfully!");
+            } catch (SQLException e) {
+                Main.sqlCode = e.getErrorCode();
+                Main.sqlState = e.getSQLState();
+                System.out.println("Code: " + Main.sqlCode + "  sqlState: " + Main.sqlState);
+            }
+        }
     }
 
-    public static void restockFood(Scanner scanner)  throws SQLException {
+    public static void restockFood(Scanner scanner) throws SQLException {
         System.out.println("\n(6) RESTOCKING FOOD\n");
 
+        System.out.print("Enter the name of the food item you'd like to restock : ");
+        String foodInput = scanner.nextLine();
+        Float[] foodInfo = PlaceOrder.getFoodInfo(foodInput);
+        int foodID = foodInfo[0].intValue();
+
+        if (foodID != -1) {
+            // Food item exist
+            System.out.println("'" + foodInput + "' found in the system.");
+
+            selectStoreText();
+            String storeIDinput = scanner.nextLine();
+            int storeID = PlaceOrder.chooseStore(storeIDinput);
+
+            while (storeID == -1) {
+                System.out.println("ERROR : There's no store with ID '" + storeIDinput + "'. Choose an ID between 1 and 5");
+                selectStoreText();
+                storeIDinput = scanner.nextLine();
+                storeID = PlaceOrder.chooseStore(storeIDinput);
+            }
+
+            int currentStock = PlaceOrder.getNumLeft(foodID, storeID);
+            System.out.println("Current stock for '" + foodInput + "' at this store : " + currentStock);
+
+            String qtyInput = getNumericInput(scanner, "How many units would you like to add : ");
+            int qtyToAdd = Integer.parseInt(qtyInput);
+
+            RestockFood.updateExistingStock(foodID, storeID, qtyToAdd);
+            System.out.println("Successfully restocked! New stock : " + (currentStock + qtyToAdd));
+
+        } else {
+            // New food item
+            System.out.println("'" + foodInput + "' not found. Let's add it as a new food item.");
+
+            // --- Product type ---
+            System.out.println("\nWhat type of product is this?");
+            System.out.println(" (1) Meat");
+            System.out.println(" (2) Produce");
+            System.out.println(" (3) Grocery");
+            System.out.print("Enter your choice : ");
+            String typeInput = scanner.nextLine().trim();
+
+            while (!(typeInput.equals("1") || typeInput.equals("2") || typeInput.equals("3"))) {
+                System.out.println("Invalid input. Please enter 1, 2, or 3.");
+                System.out.print("Enter your choice : ");
+                typeInput = scanner.nextLine().trim();
+            }
+
+            // Shared fields
+            System.out.print("Enter the price : ");
+            float price = 0;
+            while (true) {
+                try { price = Float.parseFloat(scanner.nextLine()); break; }
+                catch (NumberFormatException e) { System.out.print("Invalid input. Enter a valid price : "); }
+            }
+
+            String availability = "Y";
+
+            // --- Defaults: all type-specific fields start as NULL ---
+            String localProd       = "NULL";
+            String fruitOrVeg      = "NULL";
+            String organic         = "NULL";
+            String meatTypeSQL     = "NULL";
+            String bestBeforeSQL   = "NULL";
+            String categorySQL     = "NULL";
+            String refrigeratedSQL = "NULL";
+
+            if (typeInput.equals("1")) {
+                // --- MEAT ---
+                System.out.print("Meat type (e.g. chicken, beef, pork) : ");
+                String meatType = scanner.nextLine().trim();
+                meatTypeSQL = "'" + meatType + "'";
+
+                System.out.print("Best before date (YYYY-MM-DD, or press ENTER if not applicable) : ");
+                String bestBefore = scanner.nextLine().trim();
+                bestBeforeSQL = bestBefore.isEmpty() ? "NULL" : "'" + bestBefore + "'";
+
+            } else if (typeInput.equals("2")) {
+                // --- PRODUCE ---
+                System.out.print("Is it a fruit or vegetable? (yes/no) : ");
+                fruitOrVeg = "'" + (scanner.nextLine().trim().toLowerCase().startsWith("y") ? "Y" : "N") + "'";
+
+                System.out.print("Is it organic? (yes/no) : ");
+                organic = "'" + (scanner.nextLine().trim().toLowerCase().startsWith("y") ? "Y" : "N") + "'";
+
+                System.out.print("Is it locally produced? (yes/no) : ");
+                localProd = "'" + (scanner.nextLine().trim().toLowerCase().startsWith("y") ? "Y" : "N") + "'";
+
+            } else {
+                // --- GROCERY ---
+                String[] categories = RestockFood.getGroceryCategories();
+                System.out.println("\nExisting grocery categories :");
+                for (int i = 0; i < categories.length; i++)
+                    System.out.println(" (" + (i + 1) + ") " + categories[i]);
+
+                System.out.print("Enter the category (or type a new one) : ");
+                String category = capitalizeFirst(scanner.nextLine());
+                categorySQL = "'" + category + "'";
+
+                System.out.print("Is it refrigerated? (yes/no) : ");
+                refrigeratedSQL = "'" + (scanner.nextLine().trim().toLowerCase().startsWith("y") ? "Y" : "N") + "'";
+            }
+
+            int newFoodID = RestockFood.insertNewFood(
+                capitalizeFirst(foodInput), price, availability,
+                localProd, fruitOrVeg, organic,
+                meatTypeSQL, bestBeforeSQL, categorySQL, refrigeratedSQL
+            );
+
+            if (newFoodID == -1) {
+                System.out.println("Failed to add food item. Returning to menu.");
+                return;
+            }
+
+            //
+            System.out.println("\nFood item added! Now set the initial stock for each store.");
+            System.out.println("(Press ENTER to skip a store and leave it at 0)\n");
+
+            String[] storeNames = {"Downtown Market", "Laval Central Market",
+                                "Sherbrooke Fresh Market", "Longueuil Market", "Brossard Market"};
+
+            for (int storeID = 1; storeID <= 5; storeID++) {
+                System.out.print("Stock for " + storeNames[storeID - 1] + " (storeID " + storeID + ") : ");
+                String qtyInput = scanner.nextLine().trim();
+                int qty = 0;
+                if (!qtyInput.isEmpty()) {
+                    try { qty = Integer.parseInt(qtyInput); }
+                    catch (NumberFormatException e) { System.out.println("Invalid input, defaulting to 0."); }
+                }
+                RestockFood.insertInventoryRow(storeID, newFoodID, qty);
+            }
+
+            System.out.println("\nNew food item '" + capitalizeFirst(foodInput) + "' has been fully added and stocked!");
+        }
     }
 
     public static void mainLoop() throws SQLException {
@@ -379,9 +687,11 @@ class Main
 
     public static void main(String[] args) throws SQLException {
         statement = setupDatabase();
-        mainLoop();
-
-        statement.close ( ) ;
-        con.close ( ) ;
+        try {
+            mainLoop();
+        } finally {
+            statement.close();
+            con.close();
+        }
     }
 }

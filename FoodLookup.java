@@ -29,7 +29,7 @@ public class FoodLookup {
 
         try {
             String querySQL = "SELECT storeID FROM Inventory WHERE foodID = " + foodID +
-                    "ORDER BY numLeft DESC LIMIT 1";
+                    " ORDER BY numLeft DESC LIMIT 1";
             ResultSet rs = Main.statement.executeQuery ( querySQL ) ;
 
             if (rs.next()) {
